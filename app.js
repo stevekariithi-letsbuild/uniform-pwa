@@ -1,5 +1,5 @@
 // ── CONFIG ── paste your Airtable credentials here ──────────────────────────
-const AIRTABLE_API_KEY  = 'YOUR_AIRTABLE_API_KEY';   // pat...
+const AIRTABLE_API_KEY  = 'pat3b9jrp15AlPFWz.b7d51d6c388d9f6ebe5a0495085dbb1c9d64e577ca560a011a1fbf1a3026aba7';   // pat...
 const AIRTABLE_BASE_ID  = 'app3VirHr5wWXuJMB';
 const AIRTABLE_TABLE    = 'Dispatches';
 // ─────────────────────────────────────────────────────────────────────────────
