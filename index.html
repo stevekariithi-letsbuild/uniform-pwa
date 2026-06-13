@@ -72,25 +72,29 @@ if ('serviceWorker' in navigator) {
 // ── API with offline cache ──
 async function fetchSheet(name) {
   const cacheKey = 'sheet_' + name;
+  // Always try cache first if offline
+  if (!navigator.onLine) {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try { return JSON.parse(cached).rows; } catch(e) {}
+    }
+    throw new Error('Offline — please open the app with internet first to cache data.');
+  }
   try {
     const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}?key=${API_KEY}`);
     const d = await r.json();
     if (!d.values || d.values.length < 2) return [];
     const h = d.values[0];
     const rows = d.values.slice(1).map(row => Object.fromEntries(h.map((k,i) => [k, row[i]||''])));
-    // Save to cache
     localStorage.setItem(cacheKey, JSON.stringify({ts: Date.now(), rows}));
     return rows;
   } catch(e) {
-    // Offline — try cache
+    // Network failed — try cache
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
-      const {ts, rows} = JSON.parse(cached);
-      const mins = Math.round((Date.now()-ts)/60000);
-      console.log(`Offline: using cached ${name} (${mins} min old)`);
-      return rows;
+      try { return JSON.parse(cached).rows; } catch(err) {}
     }
-    throw new Error('No internet and no cached data for ' + name);
+    throw new Error('Could not load data. Please check your connection.');
   }
 }
 
@@ -150,7 +154,12 @@ function showName() {
 // ── SCREEN 2: SCHOOLS ──
 function showSchools() {
   if (!myName) { showName(); return; }
-  const offlineBanner = !navigator.onLine ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:12px">⚠️ Offline — using cached data. Entries will sync when online.</div>` : '';
+  const cachedSchools = localStorage.getItem('sheet_Schools');
+  const cachedStudents = localStorage.getItem('sheet_Students');
+  const offlineMsg = !navigator.onLine 
+    ? (cachedSchools ? '⚠️ Offline — using cached data. Entries will sync when online.' : '⚠️ Offline — no cached data yet. Please connect to internet first.')
+    : '';
+  const offlineBanner = offlineMsg ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:12px">${offlineMsg}</div>` : '';
   set(`<h2>Uniform Logger</h2>
     <p class="sub" style="margin-top:4px">Logged in as <strong>${myName}</strong> &nbsp;<span id="change-link" style="color:#888;cursor:pointer;font-size:13px;text-decoration:underline">change</span></p>
     ${offlineBanner}
