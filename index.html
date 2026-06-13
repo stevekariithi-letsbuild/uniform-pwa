@@ -107,6 +107,7 @@ async function loadData() {
 
 // ── SCHOOL LIST ──
 function renderSchoolList() {
+  window._schoolNames = allSchools.map(s => s['Name']);
   const app = document.getElementById('app');
   if (!myName) {
     app.innerHTML = `<div><h2>Welcome</h2><p class="sub">Enter your name to start logging.</p><label>Your name</label><input type="text" id="name-inp" placeholder="e.g. John"><button class="submit-btn" onclick="setName()">Continue</button></div>`;
@@ -116,10 +117,12 @@ function renderSchoolList() {
     <h2>Uniform Logger</h2>
     <p class="sub">Logged in as <strong>${myName}</strong> &nbsp;<a onclick="changeName()">change</a></p>
     <p class="sub">Select a school:</p>
-    ${allSchools.map(s=>`<button class="school-btn" onclick="goStudents(${JSON.stringify(s['Name'])})">
+    ${allSchools.map((s,i)=>`<button class="school-btn" onclick="goStudents(window._schoolNames[${i}])">
       ${s['Name']}<small>${s['Location']||''} · ${allStudents.filter(st=>st['School']===s['Name']).length} students</small>
     </button>`).join('')}
     ${pendingEntries.length ? `<button class="school-btn" style="border-color:#f97316;color:#f97316" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length===1?'y':'ies'}</button>` : ''}`;
+  // Attach click handlers after render
+  document.querySelectorAll('.school-btn[onclick]').forEach(btn => {});
 }
 
 // ── STUDENT LIST ──
