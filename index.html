@@ -193,7 +193,17 @@ function showItems(name, gender, shoeSize, uniformSize) {
   if (uniformSize) ['Shirt','Sweater','Shorts','Trousers','Dress','Skirt','Blouse'].forEach(k => itemSizes[k]=uniformSize);
 
   const boyItems  = [{k:'Shorts',s:CLOTHING},{k:'Trousers',s:CLOTHING},{k:'Shirt',s:CLOTHING},{k:'Sweater',s:CLOTHING},{k:'Tie',s:CLOTHING},{k:'Socks',s:CLOTHING},{k:'Shoes',s:SHOES},{k:'Boxers',s:CLOTHING},{k:'Bag',s:BAG}];
-  const girlItems = [{k:'Dress',s:CLOTHING},{k:'Skirt',s:CLOTHING},{k:'Blouse',s:CLOTHING},{k:'Sweater',s:CLOTHING},{k:'Socks',s:CLOTHING},{k:'Shoes',s:SHOES},{k:'Panties',s:CLOTHING},{k:'Boob top',s:CLOTHING},{k:'Bag',s:BAG}];
+  
+  // Check if older girl (Grade 7, 8, or 9) for boob top
+  const studentRecord = students.find(s => s['Name']===name && s['School']===session.school);
+  const cls = (studentRecord && studentRecord['Class']) ? studentRecord['Class'].toUpperCase().trim() : '';
+  const isOlderGirl = gender==='Girl' && (cls==='GRADE 7' || cls==='GRADE 8' || cls==='GRADE 9');
+  
+  const girlBase = [{k:'Dress',s:CLOTHING},{k:'Skirt',s:CLOTHING},{k:'Blouse',s:CLOTHING},{k:'Sweater',s:CLOTHING},{k:'Socks',s:CLOTHING},{k:'Shoes',s:SHOES},{k:'Panties',s:CLOTHING}];
+  if (isOlderGirl) girlBase.push({k:'Boob top',s:CLOTHING});
+  girlBase.push({k:'Bag',s:BAG});
+  const girlItems = girlBase;
+  
   const items = gender==='Boy' ? boyItems : girlItems;
   session.items = items;
 
@@ -220,15 +230,31 @@ function showItems(name, gender, shoeSize, uniformSize) {
   document.getElementById('btn-back').onclick = () => showStudents(session.school);
 
   document.getElementById('btn-fullset').onclick = () => {
+    // Map stored uniform size codes to labels
+    const sizeMap = {
+      'SB':'Small','SG':'Small','MB':'Medium','MG':'Medium','LB':'Large','LG':'Large',
+      'Small':'Small','Medium':'Medium','Large':'Large'
+    };
+    const clothingSize = sizeMap[uniformSize] || null;
+
     items.forEach(item => {
-      const defaultSize = item.s[0]; // first size option
-      itemSizes[item.k] = defaultSize;
-      notRecv[item.k] = false;
-      const id = item.k.replace(/ /g,'_');
-      document.querySelectorAll(`#sr_${id} .size-btn`).forEach(b => b.classList.toggle('active', b.dataset.val===defaultSize));
-      document.getElementById(`nr_${id}`).classList.remove('active');
+      let picked = null;
+      if (item.k === 'Shoes') {
+        // Use stored shoe size if it exists in options
+        picked = item.s.includes(shoeSize) ? shoeSize : null;
+      } else if (item.k === 'Bag') {
+        picked = 'Receiving';
+      } else {
+        picked = clothingSize || item.s[0];
+      }
+      if (picked) {
+        itemSizes[item.k] = picked;
+        notRecv[item.k] = false;
+        const id = item.k.replace(/ /g,'_');
+        document.querySelectorAll(`#sr_${id} .size-btn`).forEach(b => b.classList.toggle('active', b.dataset.val===picked));
+        document.getElementById(`nr_${id}`).classList.remove('active');
+      }
     });
-    // Scroll to save button
     document.getElementById('btn-save').scrollIntoView({behavior:'smooth'});
   };
 
