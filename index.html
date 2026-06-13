@@ -8,30 +8,50 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
-#app{max-width:480px;margin:0 auto;padding:16px}
-.screen{padding:8px 0}
-h2{font-size:20px;font-weight:700;margin-bottom:6px}
-.sub{font-size:13px;color:#888;margin-bottom:16px}
-.sub a{color:#1a1a1a;cursor:pointer}
+#app{max-width:480px;margin:0 auto;padding:16px 16px 40px}
+h2{font-size:20px;font-weight:700;margin-bottom:4px}
+h3{font-size:15px;font-weight:600;margin:16px 0 8px}
+.sub{font-size:13px;color:#888;margin-bottom:14px}
+.sub a{color:#1a1a1a;cursor:pointer;text-decoration:underline}
+.back-btn{background:none;border:none;color:#888;font-size:14px;cursor:pointer;margin-bottom:12px;padding:0;display:block}
+.search-input{width:100%;padding:10px 12px;border:1px solid #e5e5e0;border-radius:10px;font-size:15px;background:#fff;margin-bottom:10px}
+.student-list{max-height:320px;overflow-y:auto;border:1px solid #e5e5e0;border-radius:10px;background:#fff}
+.student-item{padding:11px 14px;border-bottom:1px solid #f0f0e8;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.student-item:last-child{border-bottom:none}
+.student-item:active{background:#f5f5f0}
+.student-item .meta{font-size:12px;color:#888}
+.add-student-btn{display:block;width:100%;background:#fff;border:1px dashed #ccc;border-radius:10px;padding:12px;font-size:14px;color:#555;cursor:pointer;margin-top:10px;text-align:center}
+.gender-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.gender-btn{padding:14px;border:1px solid #e5e5e0;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;text-align:center}
+.gender-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.age-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.age-btn{padding:10px 6px;border:1px solid #e5e5e0;border-radius:10px;background:#fff;font-size:13px;cursor:pointer;text-align:center}
+.age-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.item-card{background:#fff;border:1px solid #e5e5e0;border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.item-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.item-card-header span{font-size:14px;font-weight:500}
+.not-recv-btn{font-size:12px;color:#888;background:none;border:1px solid #e5e5e0;border-radius:6px;padding:3px 8px;cursor:pointer}
+.not-recv-btn.active{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+.size-row{display:flex;flex-wrap:wrap;gap:6px}
+.size-btn{padding:6px 12px;border:1px solid #e5e5e0;border-radius:8px;background:#f8f8f4;font-size:13px;cursor:pointer}
+.size-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.size-btn.nr{background:#f0f0e8;color:#aaa}
 label{display:block;font-size:13px;color:#555;margin:12px 0 4px}
-input,select,textarea{width:100%;padding:10px 12px;border:1px solid #e5e5e0;border-radius:10px;font-size:15px;background:#fff}
-textarea{height:80px;resize:vertical}
-.school-btn,.student-btn{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e5e5e0;border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:14px;cursor:pointer}
-.school-btn:active,.student-btn:active{background:#f0f0e8}
-.student-btn small{display:block;font-size:12px;color:#888;margin-top:2px}
+input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #e5e5e0;border-radius:10px;font-size:15px;background:#fff}
+textarea{height:70px;resize:vertical}
 .submit-btn{display:block;width:100%;background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;margin-top:20px}
-.back-btn{background:none;border:none;color:#888;font-size:14px;cursor:pointer;margin-bottom:12px;padding:0}
-.loading{text-align:center;padding:40px 20px;color:#888}
+.submit-btn:disabled{background:#ccc}
+.school-btn{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e5e5e0;border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:14px;cursor:pointer}
+.school-btn small{display:block;font-size:12px;color:#888;margin-top:2px}
+.loading{text-align:center;padding:40px;color:#888}
 .success{text-align:center;padding:40px 20px}
 .success h2{color:#166534}
 .success p{color:#888;margin:8px 0 20px}
 .success button{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer}
 .error{text-align:center;padding:40px 20px}
 .error h2{color:#991b1b;margin-bottom:8px}
-.error p{color:#888;margin-bottom:20px;font-size:14px}
-.error button{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.sync-btn{display:block;width:100%;background:#fff;border:1px solid #f97316;color:#f97316;border-radius:10px;padding:12px;font-size:14px;cursor:pointer;margin-top:8px}
+.error button{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer;margin-top:16px}
+.divider{font-size:11px;color:#aaa;text-align:center;margin:10px 0;text-transform:uppercase;letter-spacing:.06em}
 </style>
 </head>
 <body>
@@ -41,10 +61,13 @@ const SHEET_ID = '1EFjr4jxg4pr5FUp-O0p2SoEHv0jZEAMYuOQYVQtwx0s';
 const API_KEY  = 'AIzaSyBcjDdYjBjVXHTbvyRey9rR80wVQbgEoHs';
 const GAS_URL  = 'https://script.google.com/macros/s/AKfycbz9PY-C-uWWVmwhhWVjKEV61CWafBNZIfKSE2fZIIcbPsuK5QBsBjjM_dEFy2c5bArJqw/exec';
 
-let allSchools = [];
-let allStudents = [];
-let pendingEntries = JSON.parse(localStorage.getItem('pending') || '[]');
+const CLOTHING_SIZES = ['Small','Medium','Large'];
+const SHOE_SIZES = ['27/9','28/10','29/11','31/12','32/13','33/1','35/2','36/3','37/4','38/5','40/6','41/7','42/8'];
+const BAG_OPTIONS = ['Receiving','Not receiving'];
+
+let allSchools = [], allStudents = [];
 let myName = localStorage.getItem('loggerName') || '';
+let pendingEntries = JSON.parse(localStorage.getItem('pending') || '[]');
 let session = {};
 
 async function fetchSheet(name) {
@@ -55,16 +78,13 @@ async function fetchSheet(name) {
   const headers = data.values[0];
   return data.values.slice(1).map(row => {
     const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i] || '');
+    headers.forEach((h,i) => obj[h] = row[i]||'');
     return obj;
   });
 }
 
-async function writeRow(sheetName, rowData) {
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    body: JSON.stringify({ sheet: sheetName, row: rowData }),
-  });
+async function writeRow(sheet, row) {
+  const res = await fetch(GAS_URL, { method:'POST', body: JSON.stringify({sheet, row}) });
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || 'Write failed');
 }
@@ -74,13 +94,6 @@ function savePending(entry) {
   localStorage.setItem('pending', JSON.stringify(pendingEntries));
 }
 
-async function syncPending() {
-  const pending = [...pendingEntries];
-  for (const entry of pending) await writeRow('Dispatches', entry);
-  pendingEntries = [];
-  localStorage.setItem('pending', '[]');
-}
-
 async function loadData() {
   document.getElementById('app').innerHTML = '<div class="loading">Loading schools…</div>';
   try {
@@ -88,140 +101,240 @@ async function loadData() {
     allStudents = await fetchSheet('Students');
     renderSchoolList();
   } catch(e) {
-    document.getElementById('app').innerHTML = `
-      <div class="error">
-        <h2>Connection error</h2>
-        <p>${e.message}</p>
-        <button onclick="loadData()">Try again</button>
-      </div>`;
+    document.getElementById('app').innerHTML = `<div class="error"><h2>Connection error</h2><p>${e.message}</p><button onclick="loadData()">Try again</button></div>`;
   }
 }
 
+// ── SCHOOL LIST ──
 function renderSchoolList() {
   const app = document.getElementById('app');
   if (!myName) {
-    app.innerHTML = `
-      <div class="screen">
-        <h2>Welcome</h2>
-        <p class="sub">Enter your name to start logging uniforms.</p>
-        <label>Your name</label>
-        <input id="name-input" type="text" placeholder="e.g. John">
-        <button class="submit-btn" onclick="setName()">Continue</button>
-      </div>`;
+    app.innerHTML = `<div><h2>Welcome</h2><p class="sub">Enter your name to start logging.</p><label>Your name</label><input type="text" id="name-inp" placeholder="e.g. John"><button class="submit-btn" onclick="setName()">Continue</button></div>`;
     return;
   }
   app.innerHTML = `
-    <div class="screen">
-      <div class="header"><h2>Uniform Logger</h2></div>
-      <p class="sub">Logged in as <strong>${myName}</strong> <a onclick="changeName()">change</a></p>
-      <p class="sub">Select a school:</p>
-      ${allSchools.map(s => `<button class="school-btn" onclick="startLog('${s['Name'].replace(/'/g,"\\'")}')">
-        ${s['Name']}<small>${s['Location'] || ''}</small>
-      </button>`).join('')}
-      ${pendingEntries.length ? `<button class="sync-btn" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length===1?'y':'ies'}</button>` : ''}
-    </div>`;
+    <h2>Uniform Logger</h2>
+    <p class="sub">Logged in as <strong>${myName}</strong> &nbsp;<a onclick="changeName()">change</a></p>
+    <p class="sub">Select a school:</p>
+    ${allSchools.map(s=>`<button class="school-btn" onclick="goStudents(${JSON.stringify(s['Name'])})">
+      ${s['Name']}<small>${s['Location']||''} · ${allStudents.filter(st=>st['School']===s['Name']).length} students</small>
+    </button>`).join('')}
+    ${pendingEntries.length ? `<button class="school-btn" style="border-color:#f97316;color:#f97316" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length===1?'y':'ies'}</button>` : ''}`;
 }
 
-function startLog(schoolName) {
+// ── STUDENT LIST ──
+function goStudents(schoolName) {
   session = { school: schoolName };
+  renderStudents(schoolName, '');
+}
+
+function renderStudents(schoolName, query) {
+  const students = allStudents.filter(s => s['School'] === schoolName && (!query || s['Name'].toLowerCase().includes(query.toLowerCase())));
   document.getElementById('app').innerHTML = `
-    <div class="screen">
-      <button class="back-btn" onclick="renderSchoolList()">← Back</button>
-      <h2>${schoolName}</h2>
-      <p class="sub">Search for the student:</p>
-      <input id="student-search" type="text" placeholder="Type student name…" oninput="showMatches('${schoolName.replace(/'/g,"\\'")}')">
-      <div id="matches" style="margin-top:8px"></div>
-    </div>`;
+    <button class="back-btn" onclick="renderSchoolList()">← Back</button>
+    <h2>${schoolName}</h2>
+    <p class="sub">${allStudents.filter(s=>s['School']===schoolName).length} students · tap to select</p>
+    <input class="search-input" type="text" placeholder="Search student…" value="${query}" oninput="renderStudents(${JSON.stringify(schoolName)}, this.value)">
+    <div class="student-list">
+      ${students.slice(0,50).map(s=>`
+        <div class="student-item" onclick="goItems(${JSON.stringify(s['Name'])}, ${JSON.stringify(s['Gender'])}, ${JSON.stringify(s['Shoe Size'])}, ${JSON.stringify(s['Uniform Size'])})">
+          <span>${s['Name']}</span>
+          <span class="meta">${s['Class']} · ${s['Gender']}</span>
+        </div>`).join('')}
+      ${students.length === 0 ? '<div class="student-item" style="color:#888">No students found</div>' : ''}
+      ${students.length > 50 ? `<div class="student-item" style="color:#888;font-size:12px">Showing 50 of ${students.length} — use search to narrow down</div>` : ''}
+    </div>
+    <button class="add-student-btn" onclick="goAddStudent(${JSON.stringify(schoolName)})">+ Add new student</button>`;
 }
 
-function showMatches(schoolName) {
-  const q = document.getElementById('student-search').value.toLowerCase();
-  if (q.length < 2) { document.getElementById('matches').innerHTML = ''; return; }
-  const matches = allStudents.filter(s => s['School'] === schoolName && s['Name'].toLowerCase().includes(q)).slice(0, 8);
-  document.getElementById('matches').innerHTML = matches.map(s =>
-    `<button class="student-btn" onclick="selectStudent('${s['Name'].replace(/'/g,"\\'")}','${s['Shoe Size']}','${s['Uniform Size']}','${s['Class']}','${s['Gender']}')">
-      ${s['Name']}<small>${s['Class']} · ${s['Gender']}</small>
-    </button>`
-  ).join('') + (matches.length === 0 ? `<button class="student-btn" onclick="selectStudent('${q}','','','','')">Use "${q}" (not in list)</button>` : '');
+// ── ADD NEW STUDENT ──
+function goAddStudent(schoolName) {
+  document.getElementById('app').innerHTML = `
+    <button class="back-btn" onclick="goStudents(${JSON.stringify(schoolName)})">← Back</button>
+    <h2>New student</h2>
+    <p class="sub">${schoolName}</p>
+    <label>Full name</label>
+    <input type="text" id="ns-name" placeholder="e.g. John Kamau">
+    <label>Class</label>
+    <input type="text" id="ns-class" placeholder="e.g. Grade 3">
+    <label>Gender</label>
+    <div class="gender-row">
+      <button class="gender-btn" id="gb-boy" onclick="setNewGender('Boy')">👦 Boy</button>
+      <button class="gender-btn" id="gb-girl" onclick="setNewGender('Girl')">👧 Girl</button>
+    </div>
+    <button class="submit-btn" onclick="saveNewStudent(${JSON.stringify(schoolName)})">Add & log uniform</button>`;
 }
 
-function selectStudent(name, shoe, uniform, cls, gender) {
+let newGender = '';
+function setNewGender(g) {
+  newGender = g;
+  document.getElementById('gb-boy').classList.toggle('active', g==='Boy');
+  document.getElementById('gb-girl').classList.toggle('active', g==='Girl');
+}
+
+async function saveNewStudent(schoolName) {
+  const name = document.getElementById('ns-name').value.trim();
+  const cls = document.getElementById('ns-class').value.trim();
+  if (!name || !newGender) { alert('Please enter name and select gender.'); return; }
+  const newStudent = { School: schoolName, Name: name, Class: cls, Gender: newGender, 'Shoe Size':'', 'Uniform Size':'', Comments:'' };
+  try {
+    await writeRow('Students', newStudent);
+    allStudents.push(newStudent);
+  } catch(e) { savePending({_type:'student', ...newStudent}); }
+  goItems(name, newGender, '', '');
+}
+
+// ── ITEMS SCREEN ──
+let itemSizes = {};
+let notReceiving = {};
+
+function goItems(name, gender, shoeSize, uniformSize) {
   session.student = name;
-  session.size = uniform || shoe || '';
+  session.gender = gender;
+  itemSizes = {};
+  notReceiving = {};
+
+  // Pre-fill from student record
+  if (shoeSize) itemSizes['Shoes'] = shoeSize;
+  if (uniformSize) {
+    ['Shirt','Sweater','Shorts','Trousers','Dress','Skirt','Blouse'].forEach(i => itemSizes[i] = uniformSize);
+  }
+
+  const isGirl = gender === 'Girl';
+  const isBoy = gender === 'Boy';
+
+  const boyItems = [
+    { key:'Shorts', sizes: CLOTHING_SIZES, optional: true, label:'Shorts' },
+    { key:'Trousers', sizes: CLOTHING_SIZES, optional: true, label:'Trousers' },
+    { key:'Shirt', sizes: CLOTHING_SIZES, label:'Shirt' },
+    { key:'Sweater', sizes: CLOTHING_SIZES, label:'Sweater' },
+    { key:'Tie', sizes: CLOTHING_SIZES, label:'Tie' },
+    { key:'Socks', sizes: CLOTHING_SIZES, label:'Socks' },
+    { key:'Shoes', sizes: SHOE_SIZES, label:'Shoes' },
+    { key:'Boxers', sizes: CLOTHING_SIZES, label:'Boxers' },
+    { key:'Bag', sizes: BAG_OPTIONS, label:'Bag' },
+  ];
+
+  const girlItems = [
+    { key:'Dress', sizes: CLOTHING_SIZES, optional: true, label:'Dress' },
+    { key:'Skirt', sizes: CLOTHING_SIZES, optional: true, label:'Skirt' },
+    { key:'Blouse', sizes: CLOTHING_SIZES, optional: true, label:'Blouse' },
+    { key:'Sweater', sizes: CLOTHING_SIZES, label:'Sweater' },
+    { key:'Socks', sizes: CLOTHING_SIZES, label:'Socks' },
+    { key:'Shoes', sizes: SHOE_SIZES, label:'Shoes' },
+    { key:'Panties', sizes: CLOTHING_SIZES, label:'Panties' },
+    { key:'Boob top', sizes: CLOTHING_SIZES, label:'Boob top' },
+    { key:'Bag', sizes: BAG_OPTIONS, label:'Bag' },
+  ];
+
+  const items = isBoy ? boyItems : girlItems;
+  session.items = items;
+
+  const cards = items.map(item => `
+    <div class="item-card" id="card-${item.key.replace(/ /g,'_')}">
+      <div class="item-card-header">
+        <span>${item.label}</span>
+        <button class="not-recv-btn" id="nr-${item.key.replace(/ /g,'_')}" onclick="toggleNR(${JSON.stringify(item.key)})">Not receiving</button>
+      </div>
+      <div class="size-row" id="sizes-${item.key.replace(/ /g,'_')}">
+        ${item.sizes.map(s=>`<button class="size-btn${itemSizes[item.key]===s?' active':''}" onclick="setSize(${JSON.stringify(item.key)},${JSON.stringify(s)})">${s}</button>`).join('')}
+      </div>
+    </div>`).join('');
+
   document.getElementById('app').innerHTML = `
-    <div class="screen">
-      <button class="back-btn" onclick="startLog('${session.school.replace(/'/g,"\\'")}')">← Back</button>
-      <h2>${name}</h2>
-      <p class="sub">${session.school}</p>
-      <label>Item</label>
-      <select id="f-item">
-        <option>Uniform top</option><option>Uniform bottom</option>
-        <option>Shoes</option><option>Socks</option><option>Full set</option>
-      </select>
-      <label>Direction</label>
-      <select id="f-dir">
-        <option value="Out">Out — giving to student</option>
-        <option value="In">In — collecting back</option>
-      </select>
-      <label>Size</label>
-      <input type="text" id="f-size" value="${session.size}" placeholder="e.g. 28/10">
-      <label>Quantity</label>
-      <input type="number" id="f-qty" value="1" min="1">
-      <label>Condition</label>
-      <select id="f-cond">
-        <option>New</option><option>Good</option><option>Fair</option><option>Damaged</option>
-      </select>
-      <label>Notes (optional)</label>
-      <textarea id="f-notes" placeholder="Any notes…"></textarea>
-      <button class="submit-btn" onclick="submitEntry()">Save entry</button>
-    </div>`;
+    <button class="back-btn" onclick="goStudents(${JSON.stringify(session.school)})">← Back</button>
+    <h2>${name}</h2>
+    <p class="sub">${session.school} · ${gender}</p>
+    <h3>Select sizes for each item:</h3>
+    ${cards}
+    <label>Direction</label>
+    <select id="f-dir">
+      <option value="Out">Out — giving to student</option>
+      <option value="In">In — collecting back</option>
+    </select>
+    <label>Notes (optional)</label>
+    <textarea id="f-notes" placeholder="Any notes…"></textarea>
+    <button class="submit-btn" onclick="submitEntry()">Save entry</button>`;
+}
+
+function setSize(key, val) {
+  itemSizes[key] = val;
+  notReceiving[key] = false;
+  const id = key.replace(/ /g,'_');
+  document.querySelectorAll(`#sizes-${id} .size-btn`).forEach(b => b.classList.toggle('active', b.textContent.trim()===val));
+  document.getElementById(`nr-${id}`).classList.remove('active');
+}
+
+function toggleNR(key) {
+  const id = key.replace(/ /g,'_');
+  notReceiving[key] = !notReceiving[key];
+  if (notReceiving[key]) {
+    itemSizes[key] = 'Not receiving';
+    document.querySelectorAll(`#sizes-${id} .size-btn`).forEach(b => b.classList.remove('active'));
+    document.getElementById(`nr-${id}`).classList.add('active');
+  } else {
+    delete itemSizes[key];
+    document.getElementById(`nr-${id}`).classList.remove('active');
+  }
 }
 
 async function submitEntry() {
+  const dir = document.getElementById('f-dir').value;
+  const notes = document.getElementById('f-notes').value;
+
   const entry = {
     School: session.school,
     Student: session.student,
-    Item: document.getElementById('f-item').value,
-    Direction: document.getElementById('f-dir').value,
-    Size: document.getElementById('f-size').value,
-    Quantity: document.getElementById('f-qty').value,
-    Condition: document.getElementById('f-cond').value,
-    Notes: document.getElementById('f-notes').value,
+    Gender: session.gender,
+    Direction: dir,
+    Notes: notes,
     'Logged By': myName,
     Timestamp: new Date().toISOString(),
+    // Individual item sizes
+    Shorts: itemSizes['Shorts'] || '',
+    Trousers: itemSizes['Trousers'] || '',
+    Shirt: itemSizes['Shirt'] || '',
+    Sweater: itemSizes['Sweater'] || '',
+    Tie: itemSizes['Tie'] || '',
+    Socks: itemSizes['Socks'] || '',
+    Shoes: itemSizes['Shoes'] || '',
+    Boxers: itemSizes['Boxers'] || '',
+    Dress: itemSizes['Dress'] || '',
+    Skirt: itemSizes['Skirt'] || '',
+    Blouse: itemSizes['Blouse'] || '',
+    Panties: itemSizes['Panties'] || '',
+    'Boob top': itemSizes['Boob top'] || '',
+    Bag: itemSizes['Bag'] || '',
   };
+
   document.getElementById('app').innerHTML = '<div class="loading">Saving…</div>';
   try {
     await writeRow('Dispatches', entry);
-    document.getElementById('app').innerHTML = `<div class="success"><h2>✓ Saved!</h2><p>${entry.Student} · ${entry.Item} · ${entry.Direction}</p><button onclick="renderSchoolList()">Log another</button></div>`;
+    document.getElementById('app').innerHTML = `<div class="success"><h2>✓ Saved!</h2><p>${entry.Student} · ${entry.Direction}</p><button onclick="goStudents(${JSON.stringify(session.school)})">Next student</button></div>`;
   } catch(e) {
     savePending(entry);
-    document.getElementById('app').innerHTML = `<div class="success"><h2>✓ Saved offline</h2><p>Will sync when online.</p><button onclick="renderSchoolList()">Log another</button></div>`;
+    document.getElementById('app').innerHTML = `<div class="success"><h2>✓ Saved offline</h2><p>Will sync when online.</p><button onclick="goStudents(${JSON.stringify(session.school)})">Next student</button></div>`;
   }
 }
 
 async function trySyncNow() {
   try {
-    await syncPending();
+    const pending = [...pendingEntries];
+    for (const e of pending) await writeRow(e._type === 'student' ? 'Students' : 'Dispatches', e);
+    pendingEntries = [];
+    localStorage.setItem('pending','[]');
     alert('All entries synced!');
     renderSchoolList();
-  } catch(e) {
-    alert('Still offline — entries saved locally.');
-  }
+  } catch(e) { alert('Still offline.'); }
 }
 
 function setName() {
-  myName = document.getElementById('name-input').value.trim();
+  myName = document.getElementById('name-inp').value.trim();
   if (!myName) return;
   localStorage.setItem('loggerName', myName);
   renderSchoolList();
 }
-
-function changeName() {
-  myName = '';
-  localStorage.removeItem('loggerName');
-  renderSchoolList();
-}
+function changeName() { myName=''; localStorage.removeItem('loggerName'); renderSchoolList(); }
 
 loadData();
 </script>
