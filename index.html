@@ -1,37 +1,221 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1a1a1a">
-<title>Uniform Logger</title>
-<link rel="manifest" href="manifest.json">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
-#app{max-width:480px;margin:0 auto;padding:16px}
-.screen{padding:8px 0}
-h2{font-size:20px;font-weight:700;margin-bottom:6px}
-.sub{font-size:13px;color:#888;margin-bottom:16px}
-.sub a{color:#1a1a1a}
-label{display:block;font-size:13px;color:#555;margin:12px 0 4px}
-input,select,textarea{width:100%;padding:10px 12px;border:1px solid #e5e5e0;border-radius:10px;font-size:15px;background:#fff}
-textarea{height:80px;resize:vertical}
-.school-btn,.student-btn{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e5e5e0;border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:14px;cursor:pointer}
-.school-btn:hover,.student-btn:hover{background:#f8f8f4}
-.student-btn small{display:block;font-size:12px;color:#888;margin-top:2px}
-.submit-btn{display:block;width:100%;background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;margin-top:20px}
-.back-btn{background:none;border:none;color:#888;font-size:14px;cursor:pointer;margin-bottom:12px;padding:0}
-.sync-btn{display:block;width:100%;background:#fff;border:1px solid #f97316;color:#f97316;border-radius:10px;padding:12px;font-size:14px;cursor:pointer;margin-top:8px}
-.loading,.success{text-align:center;padding:40px 20px}
-.success h2{color:#166534}
-.success p{color:#888;margin:8px 0 20px}
-.success button{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-</style>
-</head>
-<body>
-<div id="app"><div class="loading">Loading…</div></div>
-<script src="app.js"></script>
-</body>
-</html>
+// ── CONFIG ──
+const SHEET_ID     = '1EFjr4jxg4pr5FUp-O0p2SoEHv0jZEAMYuOQYVQtwx0s';
+const API_KEY      = 'AIzaSyBcjDdYjBjVXHTbvyRey9rR80wVQbgEoHs';
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbz9PY-C-uWWVmwhhWVjKEV61CWafBNZIfKSE2fZIIcbPsuK5QBsBjjM_dEFy2c5bArJqw/exec'; // from Google Apps Script deploy
+const SCHOOLS_SHEET    = 'Schools';
+const DISPATCHES_SHEET = 'Dispatches';
+const STUDENTS_SHEET   = 'Students';
+
+// ── SERVICE WORKER REGISTRATION ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(console.error);
+}
+
+// ── STATE ──
+let allSchools = [];
+let allStudents = [];
+let pendingEntries = JSON.parse(localStorage.getItem('pending') || '[]');
+let myName = localStorage.getItem('loggerName') || '';
+let session = {};
+
+// ── SHEETS READ ──
+async function fetchSheet(sheetName) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${API_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.values || data.values.length < 2) return [];
+  const headers = data.values[0];
+  return data.values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i] || '');
+    return obj;
+  });
+}
+
+// ── SHEETS WRITE (via GAS proxy) ──
+async function writeRow(sheetName, rowData) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ sheet: sheetName, row: rowData }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Write failed');
+}
+
+// ── SYNC PENDING ENTRIES ──
+async function syncPending() {
+  if (!pendingEntries.length) return;
+  const pending = [...pendingEntries];
+  for (const entry of pending) {
+    await writeRow(DISPATCHES_SHEET, entry);
+  }
+  pendingEntries = [];
+  localStorage.setItem('pending', '[]');
+  renderPendingBadge();
+}
+
+function savePending(entry) {
+  pendingEntries.push(entry);
+  localStorage.setItem('pending', JSON.stringify(pendingEntries));
+  renderPendingBadge();
+}
+
+function renderPendingBadge() {
+  const el = document.getElementById('pending-badge');
+  if (el) el.textContent = pendingEntries.length ? `${pendingEntries.length} pending` : '';
+}
+
+// ── LOAD DATA ──
+async function loadData() {
+  document.getElementById('app').innerHTML = '<div class="loading">Loading schools…</div>';
+  try {
+    allSchools = await fetchSheet(SCHOOLS_SHEET);
+    allStudents = await fetchSheet(STUDENTS_SHEET);
+    if (!allSchools.length) throw new Error('No schools found in sheet');
+    renderSchoolList();
+    if (pendingEntries.length) syncPending().catch(() => {});
+  } catch(e) {
+    document.getElementById('app').innerHTML = `
+      <div class="screen">
+        <h2>Connection error</h2>
+        <p class="sub">` + e.message + `</p>
+        <button onclick="loadData()" style="background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer;margin-top:16px">Try again</button>
+      </div>`;
+  }
+}
+
+// ── RENDER ──
+function renderSchoolList() {
+  const app = document.getElementById('app');
+  if (!myName) {
+    app.innerHTML = `
+      <div class="screen">
+        <h2>Welcome</h2>
+        <p>Enter your name to start logging uniforms.</p>
+        <input id="name-input" type="text" placeholder="Your name…">
+        <button onclick="setName()">Continue</button>
+      </div>`;
+    return;
+  }
+  app.innerHTML = `
+    <div class="screen">
+      <div class="header">
+        <h2>Uniform Logger</h2>
+        <span id="pending-badge" style="font-size:12px;color:#f97316"></span>
+      </div>
+      <p class="sub">Logged in as <strong>${myName}</strong> <a href="#" onclick="changeName()">change</a></p>
+      <p class="sub">Select a school to log a uniform:</p>
+      ${allSchools.map((s, i) => `
+        <button class="school-btn" onclick="startLog('${s['Name']}')">${s['Name']}</button>
+      `).join('')}
+      ${pendingEntries.length ? `<button class="sync-btn" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length === 1 ? 'y' : 'ies'}</button>` : ''}
+    </div>`;
+  renderPendingBadge();
+}
+
+function startLog(schoolName) {
+  session = { school: schoolName };
+  const students = allStudents.filter(s => s['School'] === schoolName);
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="screen">
+      <button class="back-btn" onclick="renderSchoolList()">← Back</button>
+      <h2>${schoolName}</h2>
+      <p class="sub">Search for the student:</p>
+      <input id="student-search" type="text" placeholder="Type student name…" oninput="showStudentMatches('${schoolName}')">
+      <div id="student-matches"></div>
+    </div>`;
+}
+
+function showStudentMatches(schoolName) {
+  const q = document.getElementById('student-search').value.toLowerCase();
+  const matches = allStudents
+    .filter(s => s['School'] === schoolName && s['Name'].toLowerCase().includes(q))
+    .slice(0, 8);
+  document.getElementById('student-matches').innerHTML = matches.map(s =>
+    `<button class="student-btn" onclick="selectStudent('${s['Name']}','${s['Shoe Size']}','${s['Uniform Size']}','${s['Class']}','${s['Gender']}')">${s['Name']} <small>${s['Class']} · ${s['Gender']}</small></button>`
+  ).join('') + (matches.length === 0 && q.length > 1 ?
+    `<button class="student-btn" onclick="selectStudent('${q.charAt(0).toUpperCase()+q.slice(1)}','','','','')">Use "${q}" (not in list)</button>` : '');
+}
+
+function selectStudent(name, shoe, uniform, cls, gender) {
+  session.student = name;
+  session.size = uniform || shoe || '';
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="screen">
+      <button class="back-btn" onclick="startLog('${session.school}')">← Back</button>
+      <h2>${name}</h2>
+      <p class="sub">${session.school}</p>
+      <label>Item</label>
+      <select id="f-item">
+        <option>Uniform top</option><option>Uniform bottom</option>
+        <option>Shoes</option><option>Socks</option><option>Full set</option>
+      </select>
+      <label>Direction</label>
+      <select id="f-dir">
+        <option value="Out">Out — giving to student</option>
+        <option value="In">In — collecting back</option>
+      </select>
+      <label>Size</label>
+      <input type="text" id="f-size" value="${session.size}" placeholder="e.g. 28/10">
+      <label>Quantity</label>
+      <input type="number" id="f-qty" value="1" min="1">
+      <label>Condition</label>
+      <select id="f-cond">
+        <option>New</option><option>Good</option><option>Fair</option><option>Damaged</option>
+      </select>
+      <label>Notes (optional)</label>
+      <textarea id="f-notes" placeholder="Any notes…"></textarea>
+      <button class="submit-btn" onclick="submitEntry()">Save entry</button>
+    </div>`;
+}
+
+async function submitEntry() {
+  const entry = {
+    School:     session.school,
+    Student:    session.student,
+    Item:       document.getElementById('f-item').value,
+    Direction:  document.getElementById('f-dir').value,
+    Size:       document.getElementById('f-size').value,
+    Quantity:   document.getElementById('f-qty').value,
+    Condition:  document.getElementById('f-cond').value,
+    Notes:      document.getElementById('f-notes').value,
+    'Logged By': myName,
+    Timestamp:  new Date().toISOString(),
+  };
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="screen"><div class="loading">Saving…</div></div>';
+  try {
+    await writeRow(DISPATCHES_SHEET, entry);
+    app.innerHTML = `<div class="screen success"><h2>✓ Saved</h2><p>${entry.Student} · ${entry.Item} · ${entry.Direction}</p><button onclick="renderSchoolList()">Log another</button></div>`;
+  } catch(e) {
+    savePending(entry);
+    app.innerHTML = `<div class="screen success"><h2>✓ Saved offline</h2><p>Stored locally — will sync when online.</p><button onclick="renderSchoolList()">Log another</button></div>`;
+  }
+}
+
+async function trySyncNow() {
+  try {
+    await syncPending();
+    alert('All entries synced!');
+    renderSchoolList();
+  } catch(e) {
+    alert('Sync failed — still offline. Entries saved locally.');
+  }
+}
+
+function setName() {
+  myName = document.getElementById('name-input').value.trim();
+  if (!myName) return;
+  localStorage.setItem('loggerName', myName);
+  renderSchoolList();
+}
+function changeName() {
+  myName = '';
+  localStorage.removeItem('loggerName');
+  renderSchoolList();
+}
+
+// ── INIT ──
+loadData();
