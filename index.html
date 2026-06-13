@@ -64,13 +64,34 @@ let pending = JSON.parse(localStorage.getItem('pending')||'[]');
 const app = () => document.getElementById('app');
 const set = html => { app().innerHTML = html; };
 
-// ── API ──
+// ── SERVICE WORKER ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
+// ── API with offline cache ──
 async function fetchSheet(name) {
-  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}?key=${API_KEY}`);
-  const d = await r.json();
-  if (!d.values || d.values.length < 2) return [];
-  const h = d.values[0];
-  return d.values.slice(1).map(row => Object.fromEntries(h.map((k,i) => [k, row[i]||''])));
+  const cacheKey = 'sheet_' + name;
+  try {
+    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}?key=${API_KEY}`);
+    const d = await r.json();
+    if (!d.values || d.values.length < 2) return [];
+    const h = d.values[0];
+    const rows = d.values.slice(1).map(row => Object.fromEntries(h.map((k,i) => [k, row[i]||''])));
+    // Save to cache
+    localStorage.setItem(cacheKey, JSON.stringify({ts: Date.now(), rows}));
+    return rows;
+  } catch(e) {
+    // Offline — try cache
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const {ts, rows} = JSON.parse(cached);
+      const mins = Math.round((Date.now()-ts)/60000);
+      console.log(`Offline: using cached ${name} (${mins} min old)`);
+      return rows;
+    }
+    throw new Error('No internet and no cached data for ' + name);
+  }
 }
 
 async function writeRow(sheet, row) {
@@ -80,10 +101,14 @@ async function writeRow(sheet, row) {
 }
 
 // ── LOAD ──
+let isOffline = false;
 async function init() {
   set('<div class="loading">Loading…</div>');
   try {
+    // Try to load from network first, fall back to cache
+    const wasOnline = navigator.onLine;
     [schools, students] = await Promise.all([fetchSheet('Schools'), fetchSheet('Students')]);
+    isOffline = !wasOnline || !navigator.onLine;
     showSchools();
   } catch(e) {
     set(`<div class="error"><h2>Connection error</h2><p>${e.message}</p></div>`);
@@ -93,6 +118,16 @@ async function init() {
     b.onclick=init; app().appendChild(b);
   }
 }
+
+// Auto-refresh when coming back online
+window.addEventListener('online', () => {
+  if (schools.length > 0) {
+    // Silently refresh data in background
+    Promise.all([fetchSheet('Schools'), fetchSheet('Students')]).then(([s, st]) => {
+      schools=s; students=st; isOffline=false;
+    }).catch(()=>{});
+  }
+});
 
 // ── SCREEN 1: NAME ──
 function showName() {
@@ -111,8 +146,10 @@ function showName() {
 // ── SCREEN 2: SCHOOLS ──
 function showSchools() {
   if (!myName) { showName(); return; }
+  const offlineBanner = !navigator.onLine ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:12px;color:#92400e;margin-bottom:12px">⚠️ Offline — using cached data. Entries will sync when online.</div>` : '';
   set(`<h2>Uniform Logger</h2>
     <p class="sub" style="margin-top:4px">Logged in as <strong>${myName}</strong> &nbsp;<span id="change-link" style="color:#888;cursor:pointer;font-size:13px;text-decoration:underline">change</span></p>
+    ${offlineBanner}
     <p class="sub">Select a school:</p>
     <div id="school-list">
       ${schools.map((s,i) => `<button class="school-btn" data-i="${i}">${s['Name']}<small>${s['Location']||''} · ${students.filter(st=>st['School']===s['Name']).length} students</small></button>`).join('')}
