@@ -1,449 +1,217 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#0f1a0f" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Uniform Tracker</title>
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #0f1a0f;
-      --surface: #162016;
-      --surface2: #1e2d1e;
-      --border: #2a3d2a;
-      --green: #4a9c2a;
-      --green-light: #5cb832;
-      --green-dim: #2d5a1b;
-      --text: #e8f0e8;
-      --text-dim: #7a9a7a;
-      --text-muted: #4a6a4a;
-      --accent: #a8d878;
-      --red: #c0392b;
-      --radius: 12px;
-      --radius-sm: 8px;
-    }
+// ── CONFIG ──
+const SHEET_ID     = '1EFjr4jxg4pr5FUp-O0p2SoEHv0jZEAMYuOQYVQtwx0s';
+const API_KEY      = 'AIzaSyBcjDdYjBjVXHTbvyRey9rR80wVQbgEoHs';
+const GAS_URL      = 'https://script.google.com/macros/s/AKfycbz9PY-C-uWWVmwhhWVjKEV61CWafBNZIfKSE2fZIIcbPsuK5QBsBjjM_dEFy2c5bArJqw/exec'; // from Google Apps Script deploy
+const SCHOOLS_SHEET    = 'Schools';
+const DISPATCHES_SHEET = 'Dispatches';
+const STUDENTS_SHEET   = 'Students';
 
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+// ── SERVICE WORKER REGISTRATION ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(console.error);
+}
 
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+// ── STATE ──
+let allSchools = [];
+let allStudents = [];
+let pendingEntries = JSON.parse(localStorage.getItem('pending') || '[]');
+let myName = localStorage.getItem('loggerName') || '';
+let session = {};
 
-    #app {
-      max-width: 480px;
-      margin: 0 auto;
-      min-height: 100vh;
-      position: relative;
-    }
+// ── SHEETS READ ──
+async function fetchSheet(sheetName) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName)}?key=${API_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.values || data.values.length < 2) return [];
+  const headers = data.values[0];
+  return data.values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i] || '');
+    return obj;
+  });
+}
 
-    /* ── SCREENS ── */
-    .screen {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      padding-bottom: env(safe-area-inset-bottom, 20px);
-    }
+// ── SHEETS WRITE (via GAS proxy) ──
+async function writeRow(sheetName, rowData) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ sheet: sheetName, row: rowData }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Write failed');
+}
 
-    /* ── HOME ── */
-    .home-screen {
-      padding: 0;
-      justify-content: space-between;
-    }
+// ── SYNC PENDING ENTRIES ──
+async function syncPending() {
+  if (!pendingEntries.length) return;
+  const pending = [...pendingEntries];
+  for (const entry of pending) {
+    await writeRow(DISPATCHES_SHEET, entry);
+  }
+  pendingEntries = [];
+  localStorage.setItem('pending', '[]');
+  renderPendingBadge();
+}
 
-    .home-top {
-      padding: 60px 28px 40px;
-      background: linear-gradient(160deg, #162d16 0%, #0f1a0f 60%);
-      border-bottom: 1px solid var(--border);
-    }
+function savePending(entry) {
+  pendingEntries.push(entry);
+  localStorage.setItem('pending', JSON.stringify(pendingEntries));
+  renderPendingBadge();
+}
 
-    .app-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
+function renderPendingBadge() {
+  const el = document.getElementById('pending-badge');
+  if (el) el.textContent = pendingEntries.length ? `${pendingEntries.length} pending` : '';
+}
 
-    .home-top h1 {
-      font-family: 'DM Mono', monospace;
-      font-size: 36px;
-      font-weight: 500;
-      line-height: 1.1;
-      color: var(--accent);
-      margin-bottom: 10px;
-    }
+// ── LOAD DATA ──
+async function loadData() {
+  try {
+    [allSchools, allStudents] = await Promise.all([
+      fetchSheet(SCHOOLS_SHEET),
+      fetchSheet(STUDENTS_SHEET),
+    ]);
+    renderSchoolList();
+    if (pendingEntries.length) syncPending().catch(() => {});
+  } catch(e) {
+    console.warn('Offline or error — working from cache', e);
+    renderSchoolList();
+  }
+}
 
-    .subtitle {
-      font-size: 14px;
-      color: var(--text-dim);
-      font-weight: 300;
-    }
+// ── RENDER ──
+function renderSchoolList() {
+  const app = document.getElementById('app');
+  if (!myName) {
+    app.innerHTML = `
+      <div class="screen">
+        <h2>Welcome</h2>
+        <p>Enter your name to start logging uniforms.</p>
+        <input id="name-input" type="text" placeholder="Your name…">
+        <button onclick="setName()">Continue</button>
+      </div>`;
+    return;
+  }
+  app.innerHTML = `
+    <div class="screen">
+      <div class="header">
+        <h2>Uniform Logger</h2>
+        <span id="pending-badge" style="font-size:12px;color:#f97316"></span>
+      </div>
+      <p class="sub">Logged in as <strong>${myName}</strong> <a href="#" onclick="changeName()">change</a></p>
+      <p class="sub">Select a school to log a uniform:</p>
+      ${allSchools.map((s, i) => `
+        <button class="school-btn" onclick="startLog('${s['Name']}')">${s['Name']}</button>
+      `).join('')}
+      ${pendingEntries.length ? `<button class="sync-btn" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length === 1 ? 'y' : 'ies'}</button>` : ''}
+    </div>`;
+  renderPendingBadge();
+}
 
-    .home-actions {
-      padding: 32px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 1;
-    }
+function startLog(schoolName) {
+  session = { school: schoolName };
+  const students = allStudents.filter(s => s['School'] === schoolName);
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="screen">
+      <button class="back-btn" onclick="renderSchoolList()">← Back</button>
+      <h2>${schoolName}</h2>
+      <p class="sub">Search for the student:</p>
+      <input id="student-search" type="text" placeholder="Type student name…" oninput="showStudentMatches('${schoolName}')">
+      <div id="student-matches"></div>
+    </div>`;
+}
 
-    .online-status {
-      padding: 12px 24px 24px;
-      font-size: 13px;
-      font-family: 'DM Mono', monospace;
-    }
+function showStudentMatches(schoolName) {
+  const q = document.getElementById('student-search').value.toLowerCase();
+  const matches = allStudents
+    .filter(s => s['School'] === schoolName && s['Name'].toLowerCase().includes(q))
+    .slice(0, 8);
+  document.getElementById('student-matches').innerHTML = matches.map(s =>
+    `<button class="student-btn" onclick="selectStudent('${s['Name']}','${s['Shoe Size']}','${s['Uniform Size']}','${s['Class']}','${s['Gender']}')">${s['Name']} <small>${s['Class']} · ${s['Gender']}</small></button>`
+  ).join('') + (matches.length === 0 && q.length > 1 ?
+    `<button class="student-btn" onclick="selectStudent('${q.charAt(0).toUpperCase()+q.slice(1)}','','','','')">Use "${q}" (not in list)</button>` : '');
+}
 
-    .online { color: var(--green-light); }
-    .offline { color: #e8a020; }
+function selectStudent(name, shoe, uniform, cls, gender) {
+  session.student = name;
+  session.size = uniform || shoe || '';
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="screen">
+      <button class="back-btn" onclick="startLog('${session.school}')">← Back</button>
+      <h2>${name}</h2>
+      <p class="sub">${session.school}</p>
+      <label>Item</label>
+      <select id="f-item">
+        <option>Uniform top</option><option>Uniform bottom</option>
+        <option>Shoes</option><option>Socks</option><option>Full set</option>
+      </select>
+      <label>Direction</label>
+      <select id="f-dir">
+        <option value="Out">Out — giving to student</option>
+        <option value="In">In — collecting back</option>
+      </select>
+      <label>Size</label>
+      <input type="text" id="f-size" value="${session.size}" placeholder="e.g. 28/10">
+      <label>Quantity</label>
+      <input type="number" id="f-qty" value="1" min="1">
+      <label>Condition</label>
+      <select id="f-cond">
+        <option>New</option><option>Good</option><option>Fair</option><option>Damaged</option>
+      </select>
+      <label>Notes (optional)</label>
+      <textarea id="f-notes" placeholder="Any notes…"></textarea>
+      <button class="submit-btn" onclick="submitEntry()">Save entry</button>
+    </div>`;
+}
 
-    /* ── HEADER ── */
-    .screen-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
+async function submitEntry() {
+  const entry = {
+    School:     session.school,
+    Student:    session.student,
+    Item:       document.getElementById('f-item').value,
+    Direction:  document.getElementById('f-dir').value,
+    Size:       document.getElementById('f-size').value,
+    Quantity:   document.getElementById('f-qty').value,
+    Condition:  document.getElementById('f-cond').value,
+    Notes:      document.getElementById('f-notes').value,
+    'Logged By': myName,
+    Timestamp:  new Date().toISOString(),
+  };
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="screen"><div class="loading">Saving…</div></div>';
+  try {
+    await writeRow(DISPATCHES_SHEET, entry);
+    app.innerHTML = `<div class="screen success"><h2>✓ Saved</h2><p>${entry.Student} · ${entry.Item} · ${entry.Direction}</p><button onclick="renderSchoolList()">Log another</button></div>`;
+  } catch(e) {
+    savePending(entry);
+    app.innerHTML = `<div class="screen success"><h2>✓ Saved offline</h2><p>Stored locally — will sync when online.</p><button onclick="renderSchoolList()">Log another</button></div>`;
+  }
+}
 
-    .screen-header h2 {
-      font-size: 17px;
-      font-weight: 500;
-      flex: 1;
-    }
+async function trySyncNow() {
+  try {
+    await syncPending();
+    alert('All entries synced!');
+    renderSchoolList();
+  } catch(e) {
+    alert('Sync failed — still offline. Entries saved locally.');
+  }
+}
 
-    .screen-header .sub {
-      font-size: 12px;
-      color: var(--text-dim);
-      font-family: 'DM Mono', monospace;
-    }
+function setName() {
+  myName = document.getElementById('name-input').value.trim();
+  if (!myName) return;
+  localStorage.setItem('loggerName', myName);
+  renderSchoolList();
+}
+function changeName() {
+  myName = '';
+  localStorage.removeItem('loggerName');
+  renderSchoolList();
+}
 
-    .back-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      width: 34px;
-      height: 34px;
-      border-radius: var(--radius-sm);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    /* ── LIST ── */
-    .list {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      flex: 1;
-    }
-
-    .list-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      text-align: left;
-      color: var(--text);
-      font-size: 15px;
-      font-family: 'DM Sans', sans-serif;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .list-item:active, .list-item.selected {
-      background: var(--green-dim);
-      border-color: var(--green);
-      color: var(--accent);
-    }
-
-    /* ── FORM ── */
-    .form-body {
-      padding: 24px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      flex: 1;
-    }
-
-    .text-input {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      color: var(--text);
-      font-size: 16px;
-      font-family: 'DM Sans', sans-serif;
-      outline: none;
-    }
-
-    .text-input:focus { border-color: var(--green); }
-    .text-input.small { padding: 10px 14px; font-size: 14px; }
-
-    /* ── ITEMS ── */
-    .items-screen { padding-bottom: 100px; }
-
-    .items-list {
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex: 1;
-      overflow-y: auto;
-    }
-
-    .item-row {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 14px;
-      margin-bottom: 4px;
-    }
-
-    .item-label {
-      font-size: 12px;
-      color: var(--text-dim);
-      font-family: 'DM Mono', monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 8px;
-    }
-
-    .size-select {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .size-btn {
-      padding: 6px 12px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: var(--surface2);
-      color: var(--text-dim);
-      font-size: 13px;
-      cursor: pointer;
-      font-family: 'DM Sans', sans-serif;
-      transition: all 0.12s;
-    }
-
-    .size-btn.active {
-      background: var(--green-dim);
-      border-color: var(--green);
-      color: var(--accent);
-      font-weight: 500;
-    }
-
-    .notes-input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 10px 12px;
-      color: var(--text);
-      font-size: 14px;
-      font-family: 'DM Sans', sans-serif;
-      resize: none;
-      height: 72px;
-      outline: none;
-    }
-
-    .notes-input:focus { border-color: var(--green); }
-
-    /* ── FOOTER ── */
-    .items-footer {
-      position: fixed;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 100%;
-      max-width: 480px;
-      padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-      background: linear-gradient(to top, var(--bg) 70%, transparent);
-      display: flex;
-      gap: 10px;
-    }
-
-    .items-footer.two-btn .btn-secondary { flex: 1; }
-    .items-footer.two-btn .btn-primary { flex: 2; }
-
-    /* ── BUTTONS ── */
-    .btn-primary {
-      flex: 1;
-      background: var(--green);
-      border: none;
-      border-radius: var(--radius);
-      padding: 15px 20px;
-      color: #fff;
-      font-size: 15px;
-      font-weight: 600;
-      font-family: 'DM Sans', sans-serif;
-      cursor: pointer;
-      transition: background 0.15s;
-      position: relative;
-    }
-
-    .btn-primary:active { background: var(--green-light); }
-    .btn-primary:disabled { background: var(--text-muted); cursor: not-allowed; }
-
-    .btn-secondary {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 15px 20px;
-      color: var(--text);
-      font-size: 15px;
-      font-family: 'DM Sans', sans-serif;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    /* ── BADGE ── */
-    .badge {
-      background: var(--green);
-      color: #fff;
-      border-radius: 20px;
-      min-width: 22px;
-      height: 22px;
-      font-size: 12px;
-      font-weight: 600;
-      align-items: center;
-      justify-content: center;
-      padding: 0 6px;
-    }
-
-    /* ── REVIEW ── */
-    .review-body {
-      padding: 16px;
-      flex: 1;
-      overflow-y: auto;
-      padding-bottom: 100px;
-    }
-
-    .review-hero {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 12px;
-    }
-
-    .review-name {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--accent);
-      margin-bottom: 4px;
-    }
-
-    .review-meta {
-      font-size: 13px;
-      color: var(--text-dim);
-      font-family: 'DM Mono', monospace;
-    }
-
-    .review-items {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-
-    .review-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      font-size: 14px;
-    }
-
-    .review-row:last-child { border-bottom: none; }
-    .review-key { color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 12px; }
-    .review-val { font-weight: 500; }
-
-    .review-notes {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 14px;
-      font-size: 13px;
-      color: var(--text-dim);
-      margin-bottom: 10px;
-    }
-
-    .review-by {
-      font-size: 13px;
-      color: var(--text-muted);
-      font-family: 'DM Mono', monospace;
-      text-align: center;
-      padding: 8px;
-    }
-
-    /* ── SAVED ── */
-    .saved-screen {
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 40px 24px;
-      text-align: center;
-    }
-
-    .saved-icon { font-size: 64px; margin-bottom: 8px; }
-    .saved-screen h2 { font-size: 28px; color: var(--accent); }
-    .saved-screen p { color: var(--text-dim); font-size: 15px; }
-    .pending-note { color: #e8a020 !important; }
-    .synced-note { color: var(--green-light) !important; }
-
-    .saved-actions {
-      width: 100%;
-      margin-top: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    /* ── PENDING ── */
-    .pending-body { padding: 16px; flex: 1; }
-
-    .pending-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px;
-      margin-bottom: 8px;
-    }
-
-    .pending-name { font-size: 15px; font-weight: 500; }
-    .pending-meta { font-size: 12px; color: var(--text-dim); font-family: 'DM Mono', monospace; margin-top: 2px; }
-
-    .empty { color: var(--text-dim); text-align: center; padding: 40px 0; font-size: 15px; }
-
-    /* ── NOTES ROW ── */
-    .notes-row .item-label { margin-bottom: 6px; }
-  </style>
-</head>
-<body>
-  <div id="app"></div>
-  <script src="/app.js"></script>
-</body>
-</html>
+// ── INIT ──
+loadData();
