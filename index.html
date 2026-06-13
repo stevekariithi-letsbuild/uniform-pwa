@@ -107,7 +107,6 @@ async function loadData() {
 
 // ── SCHOOL LIST ──
 function renderSchoolList() {
-  window._schoolNames = allSchools.map(s => s['Name']);
   const app = document.getElementById('app');
   if (!myName) {
     app.innerHTML = `<div><h2>Welcome</h2><p class="sub">Enter your name to start logging.</p><label>Your name</label><input type="text" id="name-inp" placeholder="e.g. John"><button class="submit-btn" onclick="setName()">Continue</button></div>`;
@@ -115,14 +114,19 @@ function renderSchoolList() {
   }
   app.innerHTML = `
     <h2>Uniform Logger</h2>
-    <p class="sub">Logged in as <strong>${myName}</strong> &nbsp;<a onclick="changeName()">change</a></p>
+    <p class="sub">Logged in as <strong>${myName}</strong> &nbsp;<a id="change-name-link">change</a></p>
     <p class="sub">Select a school:</p>
-    ${allSchools.map((s,i)=>`<button class="school-btn" onclick="goStudents(window._schoolNames[${i}])">
+    ${allSchools.map((s,i)=>`<button class="school-btn" data-school-i="${i}">
       ${s['Name']}<small>${s['Location']||''} · ${allStudents.filter(st=>st['School']===s['Name']).length} students</small>
     </button>`).join('')}
-    ${pendingEntries.length ? `<button class="school-btn" style="border-color:#f97316;color:#f97316" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length===1?'y':'ies'}</button>` : ''}`;
-  // Attach click handlers after render
-  document.querySelectorAll('.school-btn[onclick]').forEach(btn => {});
+    ${pendingEntries.length ? `<button class="school-btn" id="sync-btn" style="border-color:#f97316;color:#f97316">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length===1?'y':'ies'}</button>` : ''}`;
+  document.querySelectorAll('.school-btn[data-school-i]').forEach(el => {
+    el.addEventListener('click', () => goStudents(allSchools[parseInt(el.dataset.schoolI)]['Name']));
+  });
+  const syncBtn = document.getElementById('sync-btn');
+  if (syncBtn) syncBtn.addEventListener('click', trySyncNow);
+  const changeLink = document.getElementById('change-name-link');
+  if (changeLink) changeLink.addEventListener('click', changeName);
 }
 
 // ── STUDENT LIST ──
@@ -152,8 +156,9 @@ function renderStudents(schoolName, query) {
 
 // ── ADD NEW STUDENT ──
 function goAddStudent(schoolName) {
+  window._addStudentSchool = schoolName;
   document.getElementById('app').innerHTML = `
-    <button class="back-btn" onclick="goStudents(${JSON.stringify(schoolName)})">← Back</button>
+    <button class="back-btn" id="btn-back-add">← Back</button>
     <h2>New student</h2>
     <p class="sub">${schoolName}</p>
     <label>Full name</label>
@@ -162,10 +167,14 @@ function goAddStudent(schoolName) {
     <input type="text" id="ns-class" placeholder="e.g. Grade 3">
     <label>Gender</label>
     <div class="gender-row">
-      <button class="gender-btn" id="gb-boy" onclick="setNewGender('Boy')">👦 Boy</button>
-      <button class="gender-btn" id="gb-girl" onclick="setNewGender('Girl')">👧 Girl</button>
+      <button class="gender-btn" id="gb-boy">👦 Boy</button>
+      <button class="gender-btn" id="gb-girl">👧 Girl</button>
     </div>
-    <button class="submit-btn" onclick="saveNewStudent(${JSON.stringify(schoolName)})">Add & log uniform</button>`;
+    <button class="submit-btn" id="btn-save-student">Add & log uniform</button>`;
+  document.getElementById('btn-back-add').addEventListener('click', () => goStudents(window._addStudentSchool));
+  document.getElementById('gb-boy').addEventListener('click', () => setNewGender('Boy'));
+  document.getElementById('gb-girl').addEventListener('click', () => setNewGender('Girl'));
+  document.getElementById('btn-save-student').addEventListener('click', () => saveNewStudent(window._addStudentSchool));
 }
 
 let newGender = '';
