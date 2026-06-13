@@ -105,12 +105,16 @@ let isOffline = false;
 async function init() {
   set('<div class="loading">Loading…</div>');
   try {
-    // Try to load from network first, fall back to cache
-    const wasOnline = navigator.onLine;
-    [schools, students] = await Promise.all([fetchSheet('Schools'), fetchSheet('Students')]);
-    isOffline = !wasOnline || !navigator.onLine;
-    showSchools();
+    schools = await fetchSheet('Schools');
+    showSchools(); // Show schools immediately so user can see them
+    students = await fetchSheet('Students'); // Load students in background
+    showSchools(); // Refresh with student counts
   } catch(e) {
+    // If schools loaded but students failed, still show schools
+    if (schools.length > 0) {
+      showSchools();
+      return;
+    }
     set(`<div class="error"><h2>Connection error</h2><p>${e.message}</p></div>`);
     const b = document.createElement('button');
     b.className='btn-primary'; b.textContent='Try again';
