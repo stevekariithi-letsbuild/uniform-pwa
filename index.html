@@ -30,6 +30,7 @@ h3{font-size:15px;font-weight:600;margin:16px 0 8px}
 .size-row{display:flex;flex-wrap:wrap;gap:6px}
 .size-btn{padding:6px 12px;border:1px solid #e5e5e0;border-radius:8px;background:#f8f8f4;font-size:13px;cursor:pointer}
 .size-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.full-set-btn{display:block;width:100%;background:#22c55e;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:14px}
 label{display:block;font-size:13px;color:#555;margin:12px 0 4px}
 input[type=text],select,textarea{width:100%;padding:10px 12px;border:1px solid #e5e5e0;border-radius:10px;font-size:15px;background:#fff}
 textarea{height:70px;resize:vertical}
@@ -199,7 +200,8 @@ function showItems(name, gender, shoeSize, uniformSize) {
   set(`<button class="back-btn" id="btn-back">← Back</button>
     <h2>${name}</h2>
     <p class="sub">${session.school} · ${gender}</p>
-    <h3>Select sizes for each item:</h3>
+    <button class="full-set-btn" id="btn-fullset">⚡ Full set — all items receiving</button>
+    <h3>Or select sizes individually:</h3>
     ${items.map(item => {
       const id = item.k.replace(/ /g,'_');
       return `<div class="item-card">
@@ -216,6 +218,19 @@ function showItems(name, gender, shoeSize, uniformSize) {
     <button class="btn-primary" id="btn-save">Save entry</button>`);
 
   document.getElementById('btn-back').onclick = () => showStudents(session.school);
+
+  document.getElementById('btn-fullset').onclick = () => {
+    items.forEach(item => {
+      const defaultSize = item.s[0]; // first size option
+      itemSizes[item.k] = defaultSize;
+      notRecv[item.k] = false;
+      const id = item.k.replace(/ /g,'_');
+      document.querySelectorAll(`#sr_${id} .size-btn`).forEach(b => b.classList.toggle('active', b.dataset.val===defaultSize));
+      document.getElementById(`nr_${id}`).classList.remove('active');
+    });
+    // Scroll to save button
+    document.getElementById('btn-save').scrollIntoView({behavior:'smooth'});
+  };
 
   document.querySelectorAll('.size-btn').forEach(btn => {
     btn.onclick = () => {
