@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1a1a1a">
 <title>Uniform Logger</title>
-<link rel="manifest" href="manifest.json">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh}
@@ -13,25 +12,218 @@ body{font-family:system-ui,sans-serif;background:#f5f5f0;color:#1a1a1a;min-heigh
 .screen{padding:8px 0}
 h2{font-size:20px;font-weight:700;margin-bottom:6px}
 .sub{font-size:13px;color:#888;margin-bottom:16px}
-.sub a{color:#1a1a1a}
+.sub a{color:#1a1a1a;cursor:pointer}
 label{display:block;font-size:13px;color:#555;margin:12px 0 4px}
 input,select,textarea{width:100%;padding:10px 12px;border:1px solid #e5e5e0;border-radius:10px;font-size:15px;background:#fff}
 textarea{height:80px;resize:vertical}
 .school-btn,.student-btn{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e5e5e0;border-radius:10px;padding:12px 14px;margin-bottom:8px;font-size:14px;cursor:pointer}
-.school-btn:hover,.student-btn:hover{background:#f8f8f4}
+.school-btn:active,.student-btn:active{background:#f0f0e8}
 .student-btn small{display:block;font-size:12px;color:#888;margin-top:2px}
 .submit-btn{display:block;width:100%;background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;margin-top:20px}
 .back-btn{background:none;border:none;color:#888;font-size:14px;cursor:pointer;margin-bottom:12px;padding:0}
-.sync-btn{display:block;width:100%;background:#fff;border:1px solid #f97316;color:#f97316;border-radius:10px;padding:12px;font-size:14px;cursor:pointer;margin-top:8px}
-.loading,.success{text-align:center;padding:40px 20px}
+.loading{text-align:center;padding:40px 20px;color:#888}
+.success{text-align:center;padding:40px 20px}
 .success h2{color:#166534}
 .success p{color:#888;margin:8px 0 20px}
 .success button{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer}
+.error{text-align:center;padding:40px 20px}
+.error h2{color:#991b1b;margin-bottom:8px}
+.error p{color:#888;margin-bottom:20px;font-size:14px}
+.error button{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;cursor:pointer}
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.sync-btn{display:block;width:100%;background:#fff;border:1px solid #f97316;color:#f97316;border-radius:10px;padding:12px;font-size:14px;cursor:pointer;margin-top:8px}
 </style>
 </head>
 <body>
 <div id="app"><div class="loading">Loading…</div></div>
-<script src="app.js"></script>
+<script>
+const SHEET_ID = '1EFjr4jxg4pr5FUp-O0p2SoEHv0jZEAMYuOQYVQtwx0s';
+const API_KEY  = 'AIzaSyBcjDdYjBjVXHTbvyRey9rR80wVQbgEoHs';
+const GAS_URL  = 'https://script.google.com/macros/s/AKfycbz9PY-C-uWWVmwhhWVjKEV61CWafBNZIfKSE2fZIIcbPsuK5QBsBjjM_dEFy2c5bArJqw/exec';
+
+let allSchools = [];
+let allStudents = [];
+let pendingEntries = JSON.parse(localStorage.getItem('pending') || '[]');
+let myName = localStorage.getItem('loggerName') || '';
+let session = {};
+
+async function fetchSheet(name) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(name)}?key=${API_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.values || data.values.length < 2) return [];
+  const headers = data.values[0];
+  return data.values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i] || '');
+    return obj;
+  });
+}
+
+async function writeRow(sheetName, rowData) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ sheet: sheetName, row: rowData }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Write failed');
+}
+
+function savePending(entry) {
+  pendingEntries.push(entry);
+  localStorage.setItem('pending', JSON.stringify(pendingEntries));
+}
+
+async function syncPending() {
+  const pending = [...pendingEntries];
+  for (const entry of pending) await writeRow('Dispatches', entry);
+  pendingEntries = [];
+  localStorage.setItem('pending', '[]');
+}
+
+async function loadData() {
+  document.getElementById('app').innerHTML = '<div class="loading">Loading schools…</div>';
+  try {
+    allSchools = await fetchSheet('Schools');
+    allStudents = await fetchSheet('Students');
+    renderSchoolList();
+  } catch(e) {
+    document.getElementById('app').innerHTML = `
+      <div class="error">
+        <h2>Connection error</h2>
+        <p>${e.message}</p>
+        <button onclick="loadData()">Try again</button>
+      </div>`;
+  }
+}
+
+function renderSchoolList() {
+  const app = document.getElementById('app');
+  if (!myName) {
+    app.innerHTML = `
+      <div class="screen">
+        <h2>Welcome</h2>
+        <p class="sub">Enter your name to start logging uniforms.</p>
+        <label>Your name</label>
+        <input id="name-input" type="text" placeholder="e.g. John">
+        <button class="submit-btn" onclick="setName()">Continue</button>
+      </div>`;
+    return;
+  }
+  app.innerHTML = `
+    <div class="screen">
+      <div class="header"><h2>Uniform Logger</h2></div>
+      <p class="sub">Logged in as <strong>${myName}</strong> <a onclick="changeName()">change</a></p>
+      <p class="sub">Select a school:</p>
+      ${allSchools.map(s => `<button class="school-btn" onclick="startLog('${s['Name'].replace(/'/g,"\\'")}')">
+        ${s['Name']}<small>${s['Location'] || ''}</small>
+      </button>`).join('')}
+      ${pendingEntries.length ? `<button class="sync-btn" onclick="trySyncNow()">↑ Sync ${pendingEntries.length} pending entr${pendingEntries.length===1?'y':'ies'}</button>` : ''}
+    </div>`;
+}
+
+function startLog(schoolName) {
+  session = { school: schoolName };
+  document.getElementById('app').innerHTML = `
+    <div class="screen">
+      <button class="back-btn" onclick="renderSchoolList()">← Back</button>
+      <h2>${schoolName}</h2>
+      <p class="sub">Search for the student:</p>
+      <input id="student-search" type="text" placeholder="Type student name…" oninput="showMatches('${schoolName.replace(/'/g,"\\'")}')">
+      <div id="matches" style="margin-top:8px"></div>
+    </div>`;
+}
+
+function showMatches(schoolName) {
+  const q = document.getElementById('student-search').value.toLowerCase();
+  if (q.length < 2) { document.getElementById('matches').innerHTML = ''; return; }
+  const matches = allStudents.filter(s => s['School'] === schoolName && s['Name'].toLowerCase().includes(q)).slice(0, 8);
+  document.getElementById('matches').innerHTML = matches.map(s =>
+    `<button class="student-btn" onclick="selectStudent('${s['Name'].replace(/'/g,"\\'")}','${s['Shoe Size']}','${s['Uniform Size']}','${s['Class']}','${s['Gender']}')">
+      ${s['Name']}<small>${s['Class']} · ${s['Gender']}</small>
+    </button>`
+  ).join('') + (matches.length === 0 ? `<button class="student-btn" onclick="selectStudent('${q}','','','','')">Use "${q}" (not in list)</button>` : '');
+}
+
+function selectStudent(name, shoe, uniform, cls, gender) {
+  session.student = name;
+  session.size = uniform || shoe || '';
+  document.getElementById('app').innerHTML = `
+    <div class="screen">
+      <button class="back-btn" onclick="startLog('${session.school.replace(/'/g,"\\'")}')">← Back</button>
+      <h2>${name}</h2>
+      <p class="sub">${session.school}</p>
+      <label>Item</label>
+      <select id="f-item">
+        <option>Uniform top</option><option>Uniform bottom</option>
+        <option>Shoes</option><option>Socks</option><option>Full set</option>
+      </select>
+      <label>Direction</label>
+      <select id="f-dir">
+        <option value="Out">Out — giving to student</option>
+        <option value="In">In — collecting back</option>
+      </select>
+      <label>Size</label>
+      <input type="text" id="f-size" value="${session.size}" placeholder="e.g. 28/10">
+      <label>Quantity</label>
+      <input type="number" id="f-qty" value="1" min="1">
+      <label>Condition</label>
+      <select id="f-cond">
+        <option>New</option><option>Good</option><option>Fair</option><option>Damaged</option>
+      </select>
+      <label>Notes (optional)</label>
+      <textarea id="f-notes" placeholder="Any notes…"></textarea>
+      <button class="submit-btn" onclick="submitEntry()">Save entry</button>
+    </div>`;
+}
+
+async function submitEntry() {
+  const entry = {
+    School: session.school,
+    Student: session.student,
+    Item: document.getElementById('f-item').value,
+    Direction: document.getElementById('f-dir').value,
+    Size: document.getElementById('f-size').value,
+    Quantity: document.getElementById('f-qty').value,
+    Condition: document.getElementById('f-cond').value,
+    Notes: document.getElementById('f-notes').value,
+    'Logged By': myName,
+    Timestamp: new Date().toISOString(),
+  };
+  document.getElementById('app').innerHTML = '<div class="loading">Saving…</div>';
+  try {
+    await writeRow('Dispatches', entry);
+    document.getElementById('app').innerHTML = `<div class="success"><h2>✓ Saved!</h2><p>${entry.Student} · ${entry.Item} · ${entry.Direction}</p><button onclick="renderSchoolList()">Log another</button></div>`;
+  } catch(e) {
+    savePending(entry);
+    document.getElementById('app').innerHTML = `<div class="success"><h2>✓ Saved offline</h2><p>Will sync when online.</p><button onclick="renderSchoolList()">Log another</button></div>`;
+  }
+}
+
+async function trySyncNow() {
+  try {
+    await syncPending();
+    alert('All entries synced!');
+    renderSchoolList();
+  } catch(e) {
+    alert('Still offline — entries saved locally.');
+  }
+}
+
+function setName() {
+  myName = document.getElementById('name-input').value.trim();
+  if (!myName) return;
+  localStorage.setItem('loggerName', myName);
+  renderSchoolList();
+}
+
+function changeName() {
+  myName = '';
+  localStorage.removeItem('loggerName');
+  renderSchoolList();
+}
+
+loadData();
+</script>
 </body>
 </html>
